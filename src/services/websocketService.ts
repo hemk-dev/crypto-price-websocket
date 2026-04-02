@@ -5,7 +5,7 @@ const clients = new Set<WebSocket>();
 
 function initializeWebSocketServer() {
     const wss = new WebSocketServer({ 
-        port: 8000, 
+        port: Number(process.env.WS_PORT) || 8000, 
         path: "/ws" , 
         verifyClient: () => {
             return clients.size < parseInt(process.env.WS_MAX_CONNECTIONS || "50");

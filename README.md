@@ -16,8 +16,8 @@ Real-time cryptocurrency ticker data from Binance, exposed over **HTTP REST** (l
 
 ## Prerequisites
 
-- **Node.js** 18+ (project uses Node 22 in Docker; local dev works on current LTS).
-- **npm** (comes with Node).
+- **Node.js** 18+ (project uses Node 22 in Docker | local dev works on current LTS).
+- **npm** (inbuild with Node).
 - Optional: **Docker** for containerized runs.
 
 ---
@@ -32,19 +32,20 @@ Create a **`.env`** file in the project root (same folder as `package.json`). Th
 | `RATE_LIMIT_WINDOW_MS` | No | `60000` | Rate limit window in milliseconds for `/api/price/*`. |
 | `RATE_LIMIT_MAX` | No | `4` | Max requests per IP per window for `/api/price/*`. |
 | `WS_MAX_CONNECTIONS` | No | `50` | Max concurrent WebSocket clients (enforced in `websocketService`). |
-| `BINANCE_TICKER_STREAM` | **Yes** for production | *(none)* | Full Binance combined stream WebSocket URL. If empty, the Binance client may not connect usefully. |
+| `BINANCE_TICKER_STREAM` | **Yes** | *(none)* | Full Binance combined stream WebSocket URL. If empty, the Binance client may not connect. |
 
 ### Sample `.env`
 
 ```env
 PORT=5000
+WS_PORT=8000
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=10
 WS_MAX_CONNECTIONS=50
 BINANCE_TICKER_STREAM=wss://stream.binance.com:9443/stream?streams=btcusdt@ticker/ethusdt@ticker/bnbusdt@ticker
 ```
 
-**Binance stream URL:** Use Binance’s [combined streams](https://binance-docs.github.io/apidocs/spot/en/#websocket-market-streams) format: `wss://stream.binance.com:9443/stream?streams=<stream1>/<stream2>/...`  
+**Binance stream URL:** Use Binance’s [combined streams](https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams) format: `wss://stream.binance.com:9443/stream?streams=<stream1>/<stream2>/...`  
 Each ticker stream is typically `<symbol_lowercase>@ticker`, e.g. `btcusdt@ticker`.
 
 ---
@@ -71,7 +72,7 @@ npm run dev
 
 The server prints a line like: `Server running on http://localhost:<PORT>`.
 
-### 4. Production-style run (compile then run Node)
+### 4. Production run (compile then run Node)
 
 ```bash
 npm run build
@@ -105,9 +106,21 @@ Returns an **array** of the latest `PriceUpdate` objects for every symbol curren
 [
   {
     "symbol": "BTCUSDT",
-    "lastPrice": "95000.12",
-    "changePercent24h": "1.234",
-    "timestamp": 1712000000000
+    "lastPrice": "66695.15000000",
+    "changePercent24h": "-2.088",
+    "timestamp": 1775155025308
+  },
+  {
+    "symbol": "ETHUSDT",
+    "lastPrice": "2047.67000000",
+    "changePercent24h": "-3.802",
+    "timestamp": 1775155025308
+  },
+  {
+    "symbol": "BNBUSDT",
+    "lastPrice": "580.51000000",
+    "changePercent24h": "-5.376",
+    "timestamp": 1775155024387
   }
 ]
 ```
@@ -135,9 +148,9 @@ Returns the latest price for **one** symbol. The symbol must match how Binance s
 ```json
 {
   "symbol": "BTCUSDT",
-  "lastPrice": "95000.12",
-  "changePercent24h": "1.234",
-  "timestamp": 1712000000000
+  "lastPrice": "66707.35000000",
+  "changePercent24h": "-2.082",
+  "timestamp": 1775155055312
 }
 ```
 
@@ -249,8 +262,4 @@ public/                  # Static assets (index.html)
 | 429 on REST | Lower `RATE_LIMIT_MAX` or widen `RATE_LIMIT_WINDOW_MS`, or wait for the next window. |
 | Docker build/run fails | Docker Desktop running; build context includes `package-lock.json` for reproducible `npm ci`/`npm install`. |
 
----
 
-## License
-
-ISC (see `package.json`).

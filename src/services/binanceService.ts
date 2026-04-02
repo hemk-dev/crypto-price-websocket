@@ -1,7 +1,6 @@
 import { WebSocket } from "ws";
 import type { PriceUpdate } from "../types";
 import { upsertPrice } from "../storage/priceStore";
-import { broadcast } from "./websocketService";
 import { enqueue } from "./queueService";
 
 function startBinanceTicker() {
