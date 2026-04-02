@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live prices (WebSocket)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    #status { color: #666; margin-bottom: 1rem; }
+    pre { background: #f4f4f4; padding: 1rem; border-radius: 8px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h2>Live prices (WebSocket)</h2>
+  <p id="status">Connecting…</p>
+  <p>Server pushes JSON after each Binance ticker update (all symbols in one array).</p>
+  <pre id="out">Waiting for data…</pre>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const outEl = document.getElementById("out");
+    const ws = new WebSocket("ws://localhost:8000/ws");
+
+    ws.onopen = () => {
+      statusEl.textContent = "Connected to ws://localhost:8000/ws";
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        outEl.textContent = JSON.stringify(data, null, 2);
+      } catch {
+        outEl.textContent = String(event.data);
+      }
+    };
+
+    ws.onerror = () => {
+      statusEl.textContent = "WebSocket erro";
+    };
+
+    ws.onclose = () => {
+      statusEl.textContent = "Disconnected";
+    };
+  </script>
+</body>
+</html>
