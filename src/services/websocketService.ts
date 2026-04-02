@@ -1,15 +1,16 @@
+import type { Server } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Broadcast } from "../types";
 
 const clients = new Set<WebSocket>();
 
-function initializeWebSocketServer() {
-    const wss = new WebSocketServer({ 
-        port: Number(process.env.WS_PORT) || 8000, 
-        path: "/ws" , 
+function initializeWebSocketServer(httpServer: Server) {
+    const wss = new WebSocketServer({
+        server: httpServer,
+        path: "/ws",
         verifyClient: () => {
-            return clients.size < parseInt(process.env.WS_MAX_CONNECTIONS || "50");
-        }
+            return clients.size < parseInt(process.env.WS_MAX_CONNECTIONS || "50", 10);
+        },
     });
 
     wss.on("connection", (ws) => {

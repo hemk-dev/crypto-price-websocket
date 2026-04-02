@@ -9,7 +9,7 @@ Real-time cryptocurrency ticker data from Binance, exposed over **HTTP REST** (l
 - Streams combined Binance ticker WebSocket (configurable stream URL).
 - In-memory store of the latest price per symbol.
 - **REST API** under `/api/price` with rate limiting.
-- **WebSocket server** on port `8000` at path `/ws`, pushing JSON snapshots of all latest prices.
+- **WebSocket server** on the **same port as HTTP** at path `/ws` (e.g. `ws://localhost:5000/ws`), pushing JSON snapshots of all latest prices.
 - Simple **web UI** at `/` for viewing live WebSocket data.
 
 ---
@@ -28,17 +28,18 @@ Create a **`.env`** file in the project root (same folder as `package.json`). Th
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `PORT` | No | `5000` | HTTP port for Express (REST + static `index.html`). |
+| `PORT` | No | `5000` | HTTP port for Express (REST + static `index.html`). WebSocket uses the **same** port at path `/ws` (no separate WebSocket port env var). |
 | `RATE_LIMIT_WINDOW_MS` | No | `60000` | Rate limit window in milliseconds for `/api/price/*`. |
 | `RATE_LIMIT_MAX` | No | `4` | Max requests per IP per window for `/api/price/*`. |
 | `WS_MAX_CONNECTIONS` | No | `50` | Max concurrent WebSocket clients (enforced in `websocketService`). |
 | `BINANCE_TICKER_STREAM` | **Yes** | *(none)* | Full Binance combined stream WebSocket URL. If empty, the Binance client may not connect. |
 
+**CORS:** The API uses `cors()` and allows **all** origins. Restrict origins in production if you need stricter security.
+
 ### Sample `.env`
 
 ```env
 PORT=5000
-WS_PORT=8000
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=10
 WS_MAX_CONNECTIONS=50
@@ -193,16 +194,16 @@ Tune `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX` in `.env` for local testing.
 
 ## WebSocket
 
-- **URL (local):** `ws://localhost:8000/ws`
+- **URL (local):** `ws://localhost:<PORT>/ws` (same port as HTTP; with TLS use `wss://`).
 - **Protocol:** Plain WebSocket (not Socket.IO). Messages are **JSON text** representing an **array** of `PriceUpdate` objects (same shape as `/api/price/all`), pushed after Binance updates (batched by the internal queue).
 
-Example client (browser) is in `public/index.html`. If you deploy behind another host, change the WebSocket URL from `localhost` to your server hostname and ensure port `8000` is reachable (or put a reverse proxy in front).
+The demo page `public/index.html` builds the WebSocket URL from `location` (`ws:` / `wss:` + `location.host` + `/ws`), so it works when the HTML is served from the **same host** as the API (e.g. Render). If the UI is hosted elsewhere (e.g. only on Vercel), point your client to `wss://<your-render-host>/ws` (and use **CORS** + `fetch` to the REST API as needed).
 
 ---
 
 ## Web UI
 
-Open **`http://localhost:5000/`** in a browser to load `public/index.html`, which connects to `ws://localhost:8000/ws` and prints the latest payload.
+Open **`http://localhost:5000/`** in a browser to load `public/index.html`, which connects to **`ws://localhost:5000/ws`** (or the matching `wss://` URL when served over HTTPS) and prints the latest payload.
 
 ---
 
@@ -218,10 +219,10 @@ docker build -t crypto-price-websocket .
 
 ### Run container
 
-Map **HTTP** `5000` and **WebSocket** `8000`, and pass environment variables (`.env` is not copied into the image by default if listed in `.dockerignore`):
+Map **HTTP** (and WebSocket on the same port), and pass environment variables (`.env` is not copied into the image by default if listed in `.dockerignore`):
 
 ```bash
-docker run --rm -p 5000:5000 -p 8000:8000 ^
+docker run --rm -p 5000:5000 ^
   -e PORT=5000 ^
   -e BINANCE_TICKER_STREAM=wss://stream.binance.com:9443/stream?streams=btcusdt@ticker/ethusdt@ticker/bnbusdt@ticker ^
   -e RATE_LIMIT_MAX=10 ^
@@ -238,6 +239,57 @@ curl -s http://localhost:5000/api/price/all
 
 ---
 
+## Deploy on Render (Web Service)
+
+Render runs a **long-running** Node process and exposes **one** public HTTP port (`PORT`), which matches this app (HTTP + WebSocket on the same port).
+
+### 1. Push the repo to GitHub (or GitLab / Bitbucket)
+
+Render deploys from a Git remote.
+
+### 2. Create a Web Service
+
+1. In the [Render dashboard](https://dashboard.render.com), click **New +** → **Web Service**.
+2. Connect your repository and select this project.
+3. Configure:
+   - **Root directory:** repository root (folder containing `package.json`).
+   - **Runtime:** **Node**.
+   - **Build command:** `npm install && npm run build`
+   - **Start command:** `npm start` (runs `node dist/app.js`).
+   - **Instance type:** Free or paid (free tier spins down after idle; first request may be slow).
+
+### 3. Environment variables
+
+In **Environment**, add at least:
+
+| Key | Example / notes |
+|-----|-----------------|
+| `BINANCE_TICKER_STREAM` | Same combined stream URL as in `.env` locally. |
+| `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, `WS_MAX_CONNECTIONS` | Optional; same meaning as in the table above. |
+
+Render sets **`PORT`** automatically; do not hardcode it.
+
+### 4. Deploy and verify
+
+After deploy, open your service URL (e.g. `https://your-service.onrender.com`):
+
+- **Web UI:** `https://your-service.onrender.com/`
+- **REST:** `https://your-service.onrender.com/api/price/all`
+- **WebSocket:** `wss://your-service.onrender.com/ws`
+
+Test REST:
+
+```bash
+curl -s https://your-service.onrender.com/api/price/all
+```
+
+### 5. Vercel frontend + Render backend
+
+- **CORS** is open to all origins, so `fetch("https://your-service.onrender.com/api/price/all", …)` from your Vercel page works without extra env vars.
+- For WebSockets from the Vercel page, connect to `wss://your-service.onrender.com/ws` (your static HTML cannot rely on `location.host` for the API host; use a small config or build-time env in the frontend project).
+
+---
+
 ## Project layout (overview)
 
 ```text
@@ -246,7 +298,7 @@ src/
   routes/                # HTTP routes (e.g. price API)
   services/              # Binance client, WebSocket broadcast, queue
   storage/               # In-memory price store
-  middleware/            # Rate limiting (and error handling if enabled)
+  middleware/            # CORS, rate limiting (and error handling if enabled)
   types/                 # Shared TypeScript types
 public/                  # Static assets (index.html)
 ```
@@ -258,7 +310,8 @@ public/                  # Static assets (index.html)
 | Issue | What to check |
 |-------|----------------|
 | No prices in API / empty array | Binance stream URL (`BINANCE_TICKER_STREAM`), network/firewall, and server logs for “Connected to Binance service”. |
-| WebSocket does not connect from browser | Same machine: ports `5000` and `8000` exposed; `index.html` uses `localhost:8000`—update if using another host. |
+| WebSocket does not connect from browser | Use `ws://` / `wss://` on the **same host and port** as the site (`/ws`). If the page is on Vercel and API on Render, open `wss://<render-host>/ws` explicitly. |
+| CORS / blocked fetch | This app allows all origins; if something still fails, check mixed content (HTTPS page calling HTTP API) or network errors. |
 | 429 on REST | Lower `RATE_LIMIT_MAX` or widen `RATE_LIMIT_WINDOW_MS`, or wait for the next window. |
 | Docker build/run fails | Docker Desktop running; build context includes `package-lock.json` for reproducible `npm ci`/`npm install`. |
 

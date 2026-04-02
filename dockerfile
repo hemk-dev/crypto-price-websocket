@@ -11,7 +11,7 @@ RUN npm run build
 
 RUN npm prune --production
 
+# HTTP + WebSocket (/ws) on the same port as PORT
 EXPOSE 5000
-EXPOSE 8000
 
 CMD ["npm", "start"]

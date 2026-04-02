@@ -15,12 +15,16 @@
   <pre id="out">Waiting for data…</pre>
 
   <script>
+    const BACKEND_ORIGIN = "https://crypto-price-websocket-jcx5.onrender.com";
+
     const statusEl = document.getElementById("status");
     const outEl = document.getElementById("out");
-    const ws = new WebSocket("ws://localhost:8000/ws");
+    const { protocol, host } = new URL(BACKEND_ORIGIN.trim() || location.origin);
+    const wsUrl = (protocol === "https:" ? "wss:" : "ws:") + "//" + host + "/ws";
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      statusEl.textContent = "Connected to ws://localhost:8000/ws";
+      statusEl.textContent = "Connected to " + wsUrl;
     };
 
     ws.onmessage = (event) => {
@@ -33,7 +37,7 @@
     };
 
     ws.onerror = () => {
-      statusEl.textContent = "WebSocket erro";
+      statusEl.textContent = "WebSocket error";
     };
 
     ws.onclose = () => {
